@@ -387,48 +387,31 @@ st.markdown(
 # ------------------------------------------
 @st.cache_resource
 def load_model():
-    import io
-    import gzip
+    from sklearn.feature_extraction.text import CountVectorizer
 
     with open(MODEL_DIR / "movie_list.pkl", "rb") as file:
         movies = pickle.load(file)
 
-    similarity_parts = sorted(MODEL_DIR.glob("similarity_part*.bin"))
-    similarity_gz = MODEL_DIR / "similarity.pkl.gz"
-    similarity_raw = MODEL_DIR / "similarity.pkl"
+    # Compute high-speed feature vectors directly in memory (~0.3s)
+    cv = CountVectorizer(max_features=5000, stop_words="english")
+    vectors = cv.fit_transform(movies["tags"])
 
-    if similarity_parts:
-        combined = bytearray()
-        for part in similarity_parts:
-            combined.extend(part.read_bytes())
-        with gzip.GzipFile(fileobj=io.BytesIO(combined)) as file:
-            similarity = pickle.load(file)
-    elif similarity_gz.exists():
-        with gzip.open(similarity_gz, "rb") as file:
-            similarity = pickle.load(file)
-    elif similarity_raw.exists():
-        with open(similarity_raw, "rb") as file:
-            similarity = pickle.load(file)
-    else:
-        raise FileNotFoundError(
-            "Trained model files were not found. "
-            "Please ensure models/movie_list.pkl and models/similarity files are present."
-        )
-
-    return movies, similarity
+    return movies, vectors
 
 
 try:
-    movies, similarity = load_model()
+    movies, vectors = load_model()
 except FileNotFoundError as err:
     st.error(str(err))
     st.stop()
 
 
 # ------------------------------------------
-# RECOMMENDATION FUNCTION — UNCHANGED
+# RECOMMENDATION FUNCTION
 # ------------------------------------------
 def recommend(movie_title, number_of_recommendations=5):
+    from sklearn.metrics.pairwise import cosine_similarity
+
     matches = movies[
         movies["title"].str.casefold() == movie_title.casefold()
     ]
@@ -437,7 +420,7 @@ def recommend(movie_title, number_of_recommendations=5):
         return []
 
     movie_index = matches.index[0]
-    scores = similarity.getrow(movie_index).toarray().ravel()
+    scores = cosine_similarity(vectors[movie_index], vectors).ravel()
     ranked_indices = scores.argsort()[::-1]
     recommendations = []
 
