@@ -387,15 +387,23 @@ st.markdown(
 # ------------------------------------------
 @st.cache_resource
 def load_model():
+    import io
     import gzip
 
     with open(MODEL_DIR / "movie_list.pkl", "rb") as file:
         movies = pickle.load(file)
 
+    similarity_parts = sorted(MODEL_DIR.glob("similarity_part*.bin"))
     similarity_gz = MODEL_DIR / "similarity.pkl.gz"
     similarity_raw = MODEL_DIR / "similarity.pkl"
 
-    if similarity_gz.exists():
+    if similarity_parts:
+        combined = bytearray()
+        for part in similarity_parts:
+            combined.extend(part.read_bytes())
+        with gzip.GzipFile(fileobj=io.BytesIO(combined)) as file:
+            similarity = pickle.load(file)
+    elif similarity_gz.exists():
         with gzip.open(similarity_gz, "rb") as file:
             similarity = pickle.load(file)
     elif similarity_raw.exists():
@@ -404,7 +412,7 @@ def load_model():
     else:
         raise FileNotFoundError(
             "Trained model files were not found. "
-            "Please ensure models/movie_list.pkl and models/similarity.pkl.gz are present."
+            "Please ensure models/movie_list.pkl and models/similarity files are present."
         )
 
     return movies, similarity
