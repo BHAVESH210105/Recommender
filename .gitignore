@@ -1,0 +1,11 @@
+.env
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+# Ignore raw uncompressed large model file (>100MB GitHub limit)
+models/similarity.pkl
+models/movie_list_backup.pkl
+# Ignore temporary outputs
+*.log
+poster_check_results.csv
